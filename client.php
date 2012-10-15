@@ -2,14 +2,6 @@
 
 require __DIR__.'/vendor/autoload.php';
 
-use Symfony\Component\ClassLoader\UniversalClassLoader;
-
-$loader = new UniversalClassLoader;
-$loader->registerNamespaces( array(
-    'Chat' => __DIR__ . '/src'
-));
-$loader->register( );
-
 use React\EventLoop\Factory;
 use React\Stream\Stream;
 use React\Socket\Connection;

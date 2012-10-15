@@ -8,19 +8,19 @@ class Manager implements \IteratorAggregate
 
     public function addUser( User $user )
     {
-        $this->users[ $user->getId( ) ] = $user;
+        $this->users[ (int) $user->getId( ) ] = $user;
 
         return $this;
     }
 
     public function getUser( $id )
     {
-        return $this->users[ $id ];
+        return $this->users[ (int) $id ];
     }
 
     public function removeUser( $id )
     {
-        unset( $this->users[ $id ] );
+        unset( $this->users[ (int) $id ] );
     }
 
     public function getIterator( )

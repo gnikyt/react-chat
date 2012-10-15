@@ -4,24 +4,20 @@ namespace Chat\Handler;
 
 use React\Socket\Connection;
 use Chat\Handler\ServerInterface;
+use Chat\Handler\Message;
 use Chat\User\Manager;
 use Chat\User\User;
+use Chat\Command\Command;
 
 class Server implements ServerInterface
 {
     private $user_manager,
-            $loop,
-            $colors;
+            $loop;
 
     public function __construct( Manager $user_manager, $loop )
     {
         $this->user_manager = $user_manager;
         $this->loop         = $loop;
-        $this->colors       = array(
-                                'purple'    => '1;35',
-                                'red'       => '0;31',
-                                'green'     => '1;32'
-                            );
 
         return $this;
     }
@@ -29,7 +25,16 @@ class Server implements ServerInterface
     public function onConnection( Connection $connection )
     {
         $user = $this->registerNewUser( $connection );
-        $this->write( $user->getConnection( ), "[server] What is your name? ", 'purple' );
+
+        $message = new Message;
+        $message->setMessage( array(
+            'from'      => 'server',
+            'message'   => $message->color(
+                "What is your name? ",
+                "purple"
+            )
+        ));
+        $this->write( $user->getConnection( ), $message->encode( ) );
 
         $self = $this;
         $user->getConnection( )->on( 'data', function( $data ) use( $self, $user ) {
@@ -54,38 +59,49 @@ class Server implements ServerInterface
 
     public function onData( $data, User $user )
     {
-        $from = $this->getMessageFrom( $data );
-        foreach( $this->user_manager as $current ) {
-            if( $user->getConnection( ) === $current->getConnection( ) ) {
-                if( !$user->getName( ) ) {
-                    $data = trim( $data );
-                    $user->setName( $data );
+        $message    = new Message( $data );
+        $decoded    = $message->decode( );
 
-                    $this->write( $user->getConnection( ), "[server] Welcome {$data}; Your ID: {$user->getId( )}\n", 'purple' );
+        if( $decoded->from == 0 ) {
+            $name = $this->setUserName( $user, $decoded->message );
 
-                    $logged = array( );
-                    foreach( $this->user_manager as $current ) {
-                        if( $user->getConnection( ) != $current->getConnection( ) ) {
-                            $this->write( $current->getConnection( ), "[server] {$data} has joined!\n", 'purple' );
-                            $logged[ ] = $current->getName( );
-                        }
+            $new_user_message    = new Message;
+            $new_user_message->setMessage( array(
+                'from'      => 'server',
+                'message'   => $new_user_message->color(
+                    "{$name} has joined the chat!\n",
+                    "purple"
+                )
+            ));
+            $new_user_message    = $new_user_message->encode( );
+
+            foreach( $this->user_manager as $current ) {
+                if( $user->getConnection( ) != $current->getConnection( ) ) {
+                    $this->write( $current->getConnection( ), $new_user_message );
+                }
+            }
+
+            $this->showLoggedInUsers( $user );
+        } else {
+            $decoded->from = $this->user_manager->getUser( $decoded->from )->getName( );
+
+            $message    = new Message( $decoded );
+            $encoded    = $message->encode( );
+
+            foreach( $this->user_manager as $current ) {
+                if( $user->getConnection( ) === $current->getConnection( ) ) {
+                    if( $this->isCommand( $decoded->message ) ) {
+                        $command = new Command( $this->user_manager, $user );
+                        $command->parse( $decoded->message );
+                        $command->execute( );
                     }
-
-                    $online = ( sizeof( $logged ) > 0 ) ? implode( ', ', $logged ) : 'Just you!';
-                    $this->write( $user->getConnection( ), "[server] Users online: {$online}\n", 'purple' );
 
                     continue;
                 }
 
-                if( $from[ 1 ]{0} == '/' ) {
-                    $this->command( $user, $from[ 1 ] );
+                if( !$this->isCommand( $decoded->message ) ) {
+                    $this->write( $current->getConnection( ), $encoded );
                 }
-
-                continue;
-            }
-
-            if( $from && $from[ 1 ]{0} !== '/' ) {
-                $this->write( $current->getConnection( ), "{$from[ 0 ]->getName( )}: {$from[ 1 ]}\n", 'green' );
             }
         }
     }
@@ -96,70 +112,71 @@ class Server implements ServerInterface
         $name   = $user->getName( );
         $this->user_manager->removeUser( $id );
 
+        $message = new Message;
+        $message->setMessage( array(
+            'from'      => 'server',
+            'message'   => $message->color(
+                "{$name} has disconnected.\n",
+                "purple"
+            )
+        ));
+
         foreach( $this->user_manager as $u ) {
-            $this->write( $u->getConnection( ), "[server] {$name} has disconnected.\n", 'purple' );
+            $this->write( $u->getConnection( ), $message->encode( ) );
         }
     }
 
-    private function write( Connection $connection, $message, $color = 'green' )
+    private function write( Connection $connection, $message )
     {
-        return $connection->write( $this->colorMessage( $message, $color ) );
+        $connection->write( $message . "\n" );
     }
 
-    private function colorMessage( $message, $color )
+    private function setUserName( User $user, $name )
     {
-        return "\033[{$this->colors[ $color ]}m{$message}\033[0m";
+        $name = trim( $name );
+        $user->setName( $name );
+
+        $message = new Message;
+        $message->setMessage( array(
+            'from'      => 'server',
+            'message'   => $message->color(
+                "Welcome {$name}; Your ID: {$user->getId( )}",
+                "purple"
+            )
+        ));
+
+        $this->write( $user->getConnection( ), $message->encode( ) );
+
+        return $name;
     }
 
-    private function getMessageFrom( $data )
+    private function showLoggedInUsers( User $user )
     {
-        $from = null;
-        if( strstr( $data, '[::]' ) ) {
-            list( $id, $data ) = explode( '[::]', $data );
-
-            $from = array(
-                        $this->user_manager->getUser( $id ),
-                        $data
-                    );
-        }
-
-        return $from;
-    }
-
-    private function command( User $user, $command )
-    {
-        $data     = explode( ' ', $command );
-        $command  = substr( $data[ 0 ], 1 ) . 'Command';
-
-        if( is_callable( array( $this, $command ) ) ) {
-            array_shift( $data );
-            return $this->$command( $user, $data );
-        }
-
-        return $this->write( $user->getConnection( ), "[server] Command: {$data[ 0 ]} is unknown.\n", 'purple' );
-    }
-
-    private function renameCommand( User $user, $data )
-    {
-        $old_name   = $user->getName( );
-        $new_name   = trim( $data[ 0 ] );
-        $user->setName( $new_name );
-
+        $logged = array( );
         foreach( $this->user_manager as $current ) {
-            $this->write( $current->getConnection( ), "[server] {$old_name} is now known as {$new_name}\n", 'purple' );
-        }
-    }
-
-    private function pmCommand( User $user, $data )
-    {
-        $to_name = $data[ 0 ];
-        array_shift( $data );
-        $message = trim( implode( ' ', $data ) );
-
-        foreach( $this->user_manager as $current ) {
-            if( strtolower( $current->getName( ) ) == strtolower( $to_name ) ) {
-                $this->write( $current->getConnection( ), "[PM from {$user->getName( )}] {$message}\n", 'red' );
+            if( $user->getConnection( ) == $current->getConnection( ) ) {
+                continue;
             }
+
+            $logged[ ] = $current->getName( );
         }
+
+        $count  = sizeof( $logged );
+        $online = ( $count > 0 ) ? implode( ', ', $logged ) : 'Just you!';
+
+        $message = new Message;
+        $message->setMessage( array(
+            'from'      => 'server',
+            'message'   => $message->color(
+                "{$count} users online: {$online}\n",
+                "purple"
+            )
+        ));
+        $this->write( $user->getConnection( ), $message->encode( ) );
+    }
+
+    private function isCommand( $data )
+    {
+        return ( $data{0} === '/' );
     }
 }

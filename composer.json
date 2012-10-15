@@ -2,7 +2,11 @@
     "minimum-stability": "dev",
     "require": {
         "react/react": "0.2.*",
-        "symfony/console": "dev-master",
-	    "symfony/class-loader": "dev-master"
+        "symfony/console": "dev-master"
+    },
+    "autoload": {
+        "psr-0": {
+            "Chat": "src/"
+        }
     }
 }

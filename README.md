@@ -35,11 +35,3 @@ A few commands wrote into the chat are...
 
 * **Rename:** /rename [new name]
 * **Private Message:** /pm [user name] [your message]
-
-## Todo
-
-Some things i'll be doing.
-
-* JSON for communication
-* Refactor code
-* Move autoloading into composer
