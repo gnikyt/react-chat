@@ -24,7 +24,7 @@ php server.php {PORT}
 For client connections simply type:
 
 ```bash
-php client.php {host}:{post}
+php client.php {host}:{port}
 ```
 
 You will then be connected to the chat server where you can chat to other connected clients.
