@@ -1,0 +1,8 @@
+{
+    "minimum-stability": "dev",
+    "require": {
+        "react/react": "0.2.*",
+        "symfony/console": "dev-master",
+	    "symfony/class-loader": "dev-master"
+    }
+}
