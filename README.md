@@ -6,7 +6,7 @@ This is a simple multi-user chat program experiment using React.
 
 Simply cline this repository.
 
-    git clone git@github.com:tyler-king/react-chat.git
+    git clone git://github.com/tyler-king/react-chat.git
 
 And run these two commands setup the vendor files:
 
@@ -35,3 +35,11 @@ A few commands wrote into the chat are...
 
 * **Rename:** /rename [new name]
 * **Private Message:** /pm [user name] [your message]
+
+## Todo
+
+Some things i'll be doing.
+
+* JSON for communication
+* Refactor code
+* Move autoloading into composer
